@@ -47,3 +47,17 @@
   NULL. A third occurrence can't ship silently.
 - Eval: blind stratified label set (200), local labelling UI, precision@k / nDCG / ablation.
   Smoke-tested with random labels (metrics ≈ random, as they should be).
+
+## 2026-10-27, hosted app
+
+- `pipeline/export_app.py`: 280k companies + top-25 evidence banners each → 27 MB Parquet,
+  shipped in the image and loaded into in-memory DuckDB at startup.
+- FastAPI (`app/main.py`): list/filter/sort, account detail with rank, stats, CSV export.
+- UI (`app/static/index.html`): ranked list, account drawer, deterministic talking points.
+  Caught in browser testing: talking points quoted a *hoster's* hostname sharing the IP
+  (`webdisk.afs.bbk.temporary.site` for cje.net); now only hostnames under the account's domain.
+- `.gitignore`'s `data/` would have silently excluded `app/data/` and shipped an app with no
+  data. Scoped to `/data/`.
+- Declined to install `httpx2` (unknown package suggested by an error message); tested the
+  API with curl against a real server instead, and ran the app from an `app/`-only copy to
+  mimic the container.

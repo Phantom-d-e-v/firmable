@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Breach Radar</title>
+<meta name="description" content="Find and prioritise the companies that need cybersecurity help right now, with the evidence to open the conversation.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='none' stroke='%230f766e' stroke-width='3'/><circle cx='16' cy='16' r='6' fill='%230f766e'/></svg>">
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --fg: #1c1b19; --muted: #6b6862; --line: #e6e4df;
+  --accent: #0f766e; --accent-soft: #ccfbf1; --hot: #b42318; --hot-soft: #fee4e2;
+  --warn: #b54708; --warn-soft: #fef0c7; --info: #175cd3; --info-soft: #dbeafe; --chip: #f0efeb;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141413; --panel: #1d1c1a; --fg: #eeece7; --muted: #a19e96; --line: #2f2e2b;
+  --accent: #2dd4bf; --accent-soft: #134e4a; --hot: #f97066; --hot-soft: #55160c;
+  --warn: #fdb022; --warn-soft: #4e1d09; --info: #84adff; --info-soft: #102a56; --chip: #262522;
+  --shadow: none;
+}}
+:root[data-theme="dark"] {
+  --bg: #141413; --panel: #1d1c1a; --fg: #eeece7; --muted: #a19e96; --line: #2f2e2b;
+  --accent: #2dd4bf; --accent-soft: #134e4a; --hot: #f97066; --hot-soft: #55160c;
+  --warn: #fdb022; --warn-soft: #4e1d09; --info: #84adff; --info-soft: #102a56; --chip: #262522;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 20px 16px 64px; }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+header h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+header p { margin: 0; color: var(--muted); }
+header .spacer { flex: 1; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.stat:hover { border-color: var(--accent); }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.stat span { color: var(--muted); font-size: 12.5px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.filters input, .filters select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; min-width: 0; }
+.filters input[type=search] { flex: 1 1 220px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chipbtn { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.chipbtn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
+.btn { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); text-decoration: none; }
+.meta { color: var(--muted); font-size: 12.5px; margin: 0 0 8px 2px; }
+.table { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr { cursor: pointer; } tbody tr:hover { background: var(--chip); }
+tbody tr:last-child td { border-bottom: 0; }
+.rank { color: var(--muted); font-variant-numeric: tabular-nums; width: 1%; }
+.co b { display: block; } .co small { color: var(--muted); }
+.score { width: 120px; } .bar { height: 6px; background: var(--chip); border-radius: 3px; overflow: hidden; margin-top: 5px; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--chip); margin: 0 4px 4px 0; white-space: nowrap; }
+.tag.hot { background: var(--hot-soft); color: var(--hot); } .tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.info { background: var(--info-soft); color: var(--info); }
+.why { max-width: 460px; }
+.more { display: flex; justify-content: center; padding: 14px; }
+.empty { padding: 40px; text-align: center; color: var(--muted); }
+/* drawer */
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.28); opacity: 0; pointer-events: none; transition: opacity .15s; }
+.scrim.open { opacity: 1; pointer-events: auto; }
+aside { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100vw); background: var(--panel); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .18s ease; overflow-y: auto; z-index: 10; }
+aside.open { transform: none; }
+aside .in { padding: 20px 22px 48px; }
+aside h2 { margin: 0; font-size: 20px; word-break: break-all; }
+aside h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
+.close { position: sticky; top: 0; float: right; }
+.kv { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; margin-top: 12px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; }
+.talk { margin: 0; padding-left: 18px; } .talk li { margin-bottom: 8px; }
+.comp { display: grid; grid-template-columns: 150px 1fr 40px; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 13px; }
+.comp .bar { margin: 0; } .comp .bar i.neg { background: var(--muted); }
+.ev td, .ev th { padding: 7px 8px; font-size: 13px; }
+.ev tr { cursor: default; }
+.note { color: var(--muted); font-size: 12.5px; }
+dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--fg); max-width: 680px; width: calc(100vw - 32px); padding: 22px; }
+dialog::backdrop { background: rgba(0,0,0,.35); }
+dialog h2 { margin-top: 0; font-size: 18px; } dialog li { margin-bottom: 6px; }
+@media (max-width: 760px) {
+  .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .hide-sm { display: none; }
+  .kv { grid-template-columns: 1fr; } .kv dt { margin-top: 6px; }
+  .comp { grid-template-columns: 110px 1fr 34px; }
+  .why { max-width: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Breach Radar</h1>
+    <p>Companies that need cybersecurity help now, ranked by observed internet exposure.</p>
+    <span class="spacer"></span>
+    <button class="btn" id="howBtn">How scoring works</button>
+  </header>
+
+  <section class="stats" id="stats" aria-label="Summary"></section>
+
+  <section class="filters" aria-label="Filters">
+    <input type="search" id="q" placeholder="Search company, domain or org…" aria-label="Search">
+    <select id="vertical" aria-label="Vertical"><option value="">All verticals</option></select>
+    <select id="segment" aria-label="Segment"><option value="">All sizes</option></select>
+    <select id="country" aria-label="Country"><option value="">All countries</option></select>
+    <select id="exposure" aria-label="Exposed service"><option value="">Any exposed service</option></select>
+    <select id="sort" aria-label="Sort">
+      <option value="score">Sort: priority score</option><option value="kev">Sort: known-exploited CVEs</option>
+      <option value="epss">Sort: exploit probability</option><option value="size">Sort: footprint size</option>
+    </select>
+    <div class="chips" id="signals" role="group" aria-label="Signal"></div>
+    <a class="btn" id="csv" href="#">Export CSV</a>
+  </section>
+
+  <p class="meta" id="meta"></p>
+  <div class="table">
+    <table>
+      <thead><tr><th>#</th><th>Account</th><th class="hide-sm">Fit</th><th>Score</th><th>Why now</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="more"><button class="btn" id="moreBtn" hidden>Load more</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside id="drawer" aria-label="Account detail"><div class="in" id="detail"></div></aside>
+
+<dialog id="how">
+  <h2>How scoring works</h2>
+  <p>The input is one month-slice of Shodan internet-scan banners (14.6M services on 5.0M IPs). Each service is attributed to a company, then rolled up per company.</p>
+  <ul>
+    <li><b>Attribution</b>: a company is a domain named in a TLS certificate or HTTP Host header it chose. Reverse-DNS names, hosting providers (detected by co-tenancy), shared-hosting IPs, SaaS platforms and CDNs are filtered out, and so are honeypots and attacker C2 servers.</li>
+    <li><b>Need</b>: backdoor/implant detected (+25), known-exploited CVEs from CISA KEV (+8 each, max 5), EPSS ≥ 50% (+10), exposed ICS/medical (+10), remote access/databases/app servers/edge appliances (+8), file shares and network admin (+6), cameras and printers (+3), end-of-life software (+6), TLS hygiene (up to +7).</li>
+    <li><b>Maturity</b>: security.txt (−5) or everything behind a CDN (−5): already invested.</li>
+    <li><b>Noise control</b>: KEV CVEs inferred on more than 20k banners (e.g. HTTP/2 Rapid Reset on every nginx) don't count.</li>
+    <li><b>Fit</b>: vertical (rules on domain + exposed service type) and size (IPs observed).</li>
+  </ul>
+  <p class="note">Weights are v0 and are evaluated against hand labels (precision@k, ablation). See the repository write-up.</p>
+  <form method="dialog"><button class="btn">Close</button></form>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => Number(n).toLocaleString();
+const SIGNALS = [["compromised","Backdoor detected"],["kev","Known-exploited CVE"],["exposed","Exposed service"],["eol","End-of-life"],["tls","TLS issues"]];
+const EXPOSURE = {remote_access:"Remote access (RDP/VNC/TeamViewer)", database:"Database", ics:"Industrial control (ICS)", medical:"Medical imaging (DICOM)",
+  file_share:"File share (SMB/FTP)", network_admin:"Router admin", edge_appliance:"VPN / edge appliance", app_server:"App server (WebLogic/SAP)",
+  devops:"DevOps (Docker/K8s/Vault)", camera:"Camera / DVR", printer:"Printer", physical_access:"Door / time clock"};
+const COMPONENTS = [["s_compromised","Backdoor detected"],["s_kev","Known-exploited CVEs"],["s_epss","Exploit probability"],["s_exposure","Exposed services"],
+  ["s_eol","End-of-life software"],["s_hygiene","TLS hygiene"],["s_maturity","Security maturity"]];
+const state = { q:"", vertical:"", segment:"", country:"", exposure:"", sort:"score", signal:"", offset:0, total:0, rows:[] };
+const PAGE = 50;
+
+function params(extra = {}) {
+  const p = new URLSearchParams();
+  for (const k of ["q","vertical","segment","country","exposure","sort","signal"]) if (state[k]) p.set(k, state[k]);
+  for (const [k, v] of Object.entries(extra)) p.set(k, v);
+  return p;
+}
+function syncHash() {
+  const p = params(); const c = location.hash.match(/^#\/c\/([^?]+)/);
+  history.replaceState(null, "", (c ? `#/c/${c[1]}` : "#/") + (p.toString() ? "?" + p : ""));
+}
+function readHash() {
+  const [, qs = ""] = location.hash.split("?"); const p = new URLSearchParams(qs);
+  for (const k of ["q","vertical","segment","country","exposure","sort","signal"]) state[k] = p.get(k) || (k === "sort" ? "score" : "");
+}
+
+async function getJSON(url) { const r = await fetch(url); if (!r.ok) throw new Error(r.status); return r.json(); }
+
+async function loadStats() {
+  const s = await getJSON("/api/stats"), t = s.totals;
+  const tiles = [["", `${fmt(t.hot)}`, "hot accounts (score ≥ 20)"], ["compromised", fmt(t.compromised), "with a backdoor detected"],
+                 ["kev", fmt(t.kev), "running known-exploited CVEs"], ["exposed", fmt(t.exposed), "with risky services exposed"]];
+  $("#stats").innerHTML = tiles.map(([sig, n, l]) => `<button class="stat" data-sig="${sig}"><b>${n}</b><span>${l}</span></button>`).join("");
+  $("#stats").querySelectorAll(".stat").forEach(b => b.onclick = () => { state.signal = b.dataset.sig; renderSignals(); refresh(); });
+  const fill = (id, items, label = v => v) => { const el = $(id);
+    el.insertAdjacentHTML("beforeend", items.map(f => `<option value="${esc(f.v)}">${esc(label(f.v))} (${fmt(f.n)})</option>`).join("")); };
+  fill("#vertical", s.facets.vertical, v => v[0].toUpperCase() + v.slice(1));
+  fill("#segment", s.facets.segment, v => ({smb:"SMB (<5 IPs)", "mid-market":"Mid-market (5–49 IPs)", enterprise:"Enterprise (50+ IPs)"})[v] || v);
+  fill("#country", s.facets.country);
+  fill("#exposure", s.facets.exposure, v => EXPOSURE[v] || v);
+  for (const k of ["vertical","segment","country","exposure","sort"]) $("#" + k).value = state[k];
+  $("#q").value = state.q;
+}
+
+function renderSignals() {
+  $("#signals").innerHTML = SIGNALS.map(([k, l]) => `<button class="chipbtn" aria-pressed="${state.signal === k}" data-k="${k}">${l}</button>`).join("");
+  $("#signals").querySelectorAll("button").forEach(b => b.onclick = () => { state.signal = state.signal === b.dataset.k ? "" : b.dataset.k; renderSignals(); refresh(); });
+}
+
+function reasonTags(r) {
+  return (r.reasons || []).slice(0, 3).map(t => {
+    const cls = /Backdoor/.test(t) ? "hot" : /known-exploited|EPSS/.test(t) ? "warn" : /Exposed/.test(t) ? "info" : "";
+    return `<span class="tag ${cls}">${esc(t.length > 70 ? t.slice(0, 68) + "…" : t)}</span>`;
+  }).join("");
+}
+
+function rowHTML(r, i) {
+  const pct = Math.max(2, Math.min(100, r.score));
+  return `<tr data-d="${esc(r.company_domain)}">
+    <td class="rank">${i + 1}</td>
+    <td class="co"><b>${esc(r.company_domain)}</b><small>${esc(r.org || "")} · ${esc(r.country || "?")}</small></td>
+    <td class="hide-sm"><span class="tag">${esc(r.vertical)}</span><span class="tag">${esc(r.segment)}</span></td>
+    <td class="score"><span class="num">${Math.round(r.score)}</span><div class="bar"><i style="width:${pct}%"></i></div></td>
+    <td class="why">${reasonTags(r) || '<span class="note">Hygiene signals only</span>'}</td></tr>`;
+}
+
+async function refresh(append = false) {
+  if (!append) state.offset = 0;
+  syncHash();
+  $("#csv").href = "/api/export.csv?" + params();
+  const data = await getJSON("/api/companies?" + params({ limit: PAGE, offset: state.offset }));
+  state.total = data.total;
+  state.rows = append ? state.rows.concat(data.rows) : data.rows;
+  $("#rows").innerHTML = state.rows.length ? state.rows.map(rowHTML).join("")
+    : `<tr><td colspan="5" class="empty">No accounts match these filters.</td></tr>`;
+  $("#meta").textContent = `${fmt(state.total)} accounts · showing ${fmt(state.rows.length)}`;
+  $("#moreBtn").hidden = state.rows.length >= state.total;
+  $("#rows").querySelectorAll("tr[data-d]").forEach(tr => tr.onclick = () => openCompany(tr.dataset.d));
+}
+
+// Only quote a hostname that belongs to the account; hosters' names on the same IP would confuse the rep.
+let currentDomain = "";
+function host(e) {
+  const own = (e.hostnames || []).find(h => h === currentDomain || h.endsWith("." + currentDomain));
+  return own || e.ip;
+}
+function talkingPoints(c, ev) {
+  const pts = [], seen = new Set();
+  const add = (key, s) => { if (!seen.has(key) && pts.length < 5) { seen.add(key); pts.push(s); } };
+  for (const e of ev) {
+    const where = `<code>${esc(host(e))}:${e.port}</code>`;
+    if (e.is_compromised) add("comp", `A backdoor signature (<code>${esc(e.module)}</code>) answered on ${where}, so this host is likely already compromised. Lead with incident response.`);
+    if (e.kev_cves && e.kev_cves.length) add("kev:" + e.kev_cves[0], `${where} runs ${esc(e.product || "a service")}${e.version ? " " + esc(e.version) : ""} affected by <b>${esc(e.kev_cves[0])}</b>${e.kev_cves.length > 1 ? ` and ${e.kev_cves.length - 1} more` : ""}, on CISA's Known Exploited Vulnerabilities list, so attackers are using it today.`);
+    if (e.exposure && e.exposure !== "compromise") add("exp:" + e.exposure, `${esc(EXPOSURE[e.exposure] || e.exposure)} is reachable from the internet on ${where}${e.product ? ` (${esc(e.product)})` : ""}.`);
+    if (e.eol) add("eol", `End-of-life software (${esc(e.product || e.module)}) on ${where} no longer gets security patches.`);
+    if (e.cert_expired) add("cert", `The TLS certificate on ${where} has expired: visible to every customer who visits.`);
+  }
+  if (!pts.length) add("none", "Only hygiene-level signals; better as a nurture account than a call this week.");
+  return pts;
+}
+
+async function openCompany(domain) {
+  history.replaceState(null, "", `#/c/${encodeURIComponent(domain)}` + (params().toString() ? "?" + params() : ""));
+  $("#detail").innerHTML = `<p class="note">Loading…</p>`;
+  $("#drawer").classList.add("open"); $("#scrim").classList.add("open");
+  let d;
+  try { d = await getJSON(`/api/companies/${encodeURIComponent(domain)}`); }
+  catch { $("#detail").innerHTML = `<button class="btn close" onclick="closeCompany()">Close</button><p>Account not found.</p>`; return; }
+  const c = d.company, max = Math.max(25, ...COMPONENTS.map(([k]) => Math.abs(c[k] || 0)));
+  currentDomain = c.company_domain;
+  $("#detail").innerHTML = `
+    <button class="btn close" onclick="closeCompany()" aria-label="Close">Close</button>
+    <h2><a href="https://${esc(c.company_domain)}" target="_blank" rel="noopener">${esc(c.company_domain)}</a></h2>
+    <p class="note">Rank #${fmt(d.rank)} of ${fmt(state.total || 280407)} · score <b>${Math.round(c.score)}</b></p>
+    <dl class="kv">
+      <dt>Network owner</dt><dd>${esc(c.org || "—")} · ${esc(c.country || "?")}</dd>
+      <dt>Cert organisation</dt><dd>${esc(c.cert_org || "—")}</dd>
+      <dt>Fit</dt><dd><span class="tag">${esc(c.vertical)}</span><span class="tag">${esc(c.segment)}</span> ${fmt(c.services)} services on ${fmt(c.ips)} IPs</dd>
+      <dt>Last seen</dt><dd>${esc(String(c.last_seen || "").slice(0, 16).replace("T", " "))} UTC</dd>
+    </dl>
+    <h3>Talking points</h3>
+    <ul class="talk">${talkingPoints(c, d.evidence).map(p => `<li>${p}</li>`).join("")}</ul>
+    <h3>Score breakdown</h3>
+    ${COMPONENTS.map(([k, l]) => { const v = c[k] || 0; return `<div class="comp"><span>${l}</span>
+      <div class="bar"><i class="${v < 0 ? "neg" : ""}" style="width:${Math.abs(v) / max * 100}%"></i></div><span class="num">${v > 0 ? "+" : ""}${v}</span></div>`; }).join("")}
+    <h3>Evidence (${d.evidence.length} most relevant services)</h3>
+    <div style="overflow-x:auto"><table class="ev"><thead><tr><th>Host</th><th>Service</th><th>Finding</th></tr></thead><tbody>
+    ${d.evidence.map(e => `<tr><td><code>${esc(host(e))}:${e.port}</code><br><span class="note mono">${esc(e.ip)}</span></td>
+      <td>${esc(e.product || e.module)}${e.version ? " " + esc(e.version) : ""}${e.http_title ? `<br><span class="note">“${esc(e.http_title.slice(0, 60))}”</span>` : ""}</td>
+      <td>${[e.is_compromised ? '<span class="tag hot">backdoor</span>' : "",
+             ...(e.kev_cves || []).slice(0, 4).map(k => `<a class="tag warn" href="https://nvd.nist.gov/vuln/detail/${esc(k)}" target="_blank" rel="noopener">${esc(k)}</a>`),
+             e.exposure && e.exposure !== "compromise" ? `<span class="tag info">${esc(EXPOSURE[e.exposure] || e.exposure)}</span>` : "",
+             e.max_epss >= 0.5 ? `<span class="tag warn">EPSS ${Math.round(e.max_epss * 100)}%</span>` : "",
+             e.eol ? '<span class="tag">EOL</span>' : "", e.cert_expired ? '<span class="tag">cert expired</span>' : "",
+             e.weak_tls ? '<span class="tag">TLS 1.0/1.1</span>' : "", e.n_vulns && !(e.kev_cves || []).length ? `<span class="tag">${e.n_vulns} CVEs (version-inferred)</span>` : ""
+            ].join("") || '<span class="note">—</span>'}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="note">Source: Shodan banners, crawl of 25–26 Oct 2026. Findings are observed from the internet; CVEs marked version-inferred are not verified.</p>`;
+}
+function closeCompany() { $("#drawer").classList.remove("open"); $("#scrim").classList.remove("open"); history.replaceState(null, "", "#/" + (params().toString() ? "?" + params() : "")); }
+
+let t;
+$("#q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value.trim(); refresh(); }, 250); });
+for (const k of ["vertical","segment","country","exposure","sort"]) $("#" + k).addEventListener("change", e => { state[k] = e.target.value; refresh(); });
+$("#moreBtn").onclick = () => { state.offset += PAGE; refresh(true); };
+$("#scrim").onclick = closeCompany;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeCompany(); });
+$("#howBtn").onclick = () => $("#how").showModal();
+
+(async () => {
+  readHash(); renderSignals();
+  await loadStats(); await refresh();
+  const m = location.hash.match(/^#\/c\/([^?]+)/); if (m) openCompany(decodeURIComponent(m[1]));
+})();
+</script>
+</body>
+</html>

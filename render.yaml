@@ -1,0 +1,7 @@
+# One-click deploy: Render dashboard -> New -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: breach-radar
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
