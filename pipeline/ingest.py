@@ -16,6 +16,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import sys
 import time
 from collections import deque
@@ -25,7 +26,7 @@ from pathlib import Path
 import polars as pl
 import zstandard
 
-from pipeline.extract import extract_line
+from pipeline.extract import EXTRACT_VERSION, extract_line
 
 BATCH_LINES = 20_000
 
@@ -60,7 +61,7 @@ def _process(args) -> tuple[int, int]:
 
 def file_key(path: Path) -> str:
     st = path.stat()
-    return f"{path.name}:{st.st_size}:{int(st.st_mtime)}"
+    return f"{path.name}:{st.st_size}:{int(st.st_mtime)}:v{EXTRACT_VERSION}"
 
 
 def ingest(path: Path, out: Path, workers: int, limit: int | None = None) -> dict:
@@ -71,7 +72,14 @@ def ingest(path: Path, out: Path, workers: int, limit: int | None = None) -> dic
         return {}
     file_id = hashlib.sha1(key.encode()).hexdigest()[:10]
     part_dir = out / "banners" / f"file_id={file_id}"
-    part_dir.mkdir(parents=True, exist_ok=True)
+    # Drop stale outputs of this same input from older extractor versions / crashed runs.
+    for old in (out / "banners").glob(f"file_id=*"):
+        if old != part_dir and (old / "_source").exists() and (old / "_source").read_text() == path.name:
+            shutil.rmtree(old)
+    if part_dir.exists():
+        shutil.rmtree(part_dir)
+    part_dir.mkdir(parents=True)
+    (part_dir / "_source").write_text(path.name)
 
     t0, seen, kept = time.time(), 0, 0
     # Bounded in-flight queue: Executor.map would drain the whole 75 GB iterator up front.

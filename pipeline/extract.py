@@ -13,6 +13,9 @@ import re
 import orjson
 import tldextract
 
+# Bump when extraction logic changes: invalidates the ingest manifest so files re-run.
+EXTRACT_VERSION = 2
+
 # Offline PSL snapshot: never hit the network from workers.
 _TLD = tldextract.TLDExtract(suffix_list_urls=())
 
@@ -29,24 +32,42 @@ INFRA_DOMAINS = frozenset({
     "digitaloceanspaces.com", "comcast.net", "verizon.net", "rr.com", "sbcglobal.net",
     "charter.com", "cox.net", "ip-addr.es", "static.ovh.net", "secureserver.net",
     "fastly.net", "edgekey.net", "vercel-dns.com", "herokuapp.com", "netlify.app",
+    # Multi-tenant SaaS: the registrable domain is the platform, not the customer.
+    "nationbuilder.com", "azurewebsites.net", "github.io", "squarespace.com",
+    "myshopify.com", "wixsite.com", "wordpress.com", "blogspot.com", "webflow.io",
 })
 
 # Shodan modules that fingerprint attacker infrastructure (C2 panels, RATs). These hosts
 # are not prospects; keep them flagged so they can be excluded or used as a negative.
-MALWARE_MODULE_HINTS = ("-rat", "c2", "cobalt", "sliver", "metasploit", "havoc", "mythic")
+MALWARE_MODULE_HINTS = ("-rat", "njrat", "blackshades", "c2", "cobalt", "sliver",
+                        "metasploit", "havoc", "mythic")
+
+# Modules that detect an implant/backdoor *on the victim*: the opposite of the above,
+# the strongest "needs help now" signal in the file.
+COMPROMISE_MODULES = frozenset({"ta14-353a", "xiaongmai-backdoor"})
 
 # Exposure classes: services that should never face the internet for a normal business.
 EXPOSURE_BY_MODULE = {
     "rdp": "remote_access", "vnc": "remote_access", "telnet": "remote_access",
+    "teamviewer": "remote_access", "x11": "remote_access", "nomachine": "remote_access",
     "mikrotik-routeros": "network_admin", "mikrotik-winbox": "network_admin",
+    "mikrotik-routeros-api": "network_admin",
     "smb": "file_share", "ftp": "file_share", "rsync": "file_share", "nfs": "file_share",
+    "iscsi": "file_share", "git": "file_share",
     "mongodb": "database", "redis": "database", "elastic": "database", "mysql": "database",
     "mssql": "database", "postgresql": "database", "couchdb": "database",
-    "clickhouse": "database", "influxdb": "database", "cassandra": "database",
+    "clickhouse": "database", "clickhouse-native": "database", "influxdb": "database",
+    "cassandra": "database", "oracle-tns": "database", "ibm-db2-drda": "database", "riak": "database",
     "automated-tank-gauge": "ics", "bacnet": "ics", "modbus": "ics", "s7": "ics",
-    "dnp3": "ics", "dicom": "medical", "hl7": "medical",
-    "kubernetes": "devops", "docker": "devops", "etcd": "devops",
-    "rtsp-tcp": "camera", "dahua-dvr": "camera", "hikvision": "camera",
+    "dnp3": "ics", "omron-tcp": "ics", "plc5": "ics", "general-electric-srtp": "ics",
+    "unitronics-pcom": "ics", "matrikon-opc": "ics", "lsv2": "ics",  # lsv2 = Heidenhain CNC
+    "dicom": "medical", "hl7": "medical",
+    "kubernetes": "devops", "docker": "devops", "etcd": "devops", "vault": "devops",
+    "java-rmi": "devops",
+    "weblogic": "app_server", "sap-router": "app_server",  # perennial KEV targets
+    "rtsp-tcp": "camera", "dahua-dvr": "camera", "hikvision": "camera", "reolink-baichuan": "camera",
+    "printer-job-language": "printer", "handpunch": "physical_access",
+    "ta14-353a": "compromise", "xiaongmai-backdoor": "compromise",
 }
 EXPOSURE_BY_PORT = {
     3389: "remote_access", 5900: "remote_access", 23: "remote_access",
@@ -166,7 +187,7 @@ def extract(rec: dict) -> dict:
         "is_cdn": "cdn" in tags,
         "is_cloud": "cloud" in tags or bool(rec.get("cloud")),
         "is_honeypot": "honeypot" in tags,
-        "is_compromised": "compromised" in tags,
+        "is_compromised": "compromised" in tags or module in COMPROMISE_MODULES,
         "is_malware_infra": any(h in module for h in MALWARE_MODULE_HINTS),
         "eol_product": "eol-product" in tags,
         "eol_os": "eol-os" in tags,

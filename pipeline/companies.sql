@@ -81,7 +81,7 @@ agg as (
         max(max_cvss)                               as max_cvss,
         max(max_epss)                               as max_epss,
         sum(n_vulns)                                as vulns,
-        coalesce(list(distinct exposure) filter (where exposure is not null), []) as exposures,
+        coalesce(list(distinct exposure) filter (where exposure is not null and exposure <> 'compromise'), []) as exposures,
         bool_or(is_compromised)                     as compromised,
         bool_or(eol_product or eol_os)              as eol,
         bool_or(cert_expired)                       as cert_expired,
@@ -94,25 +94,47 @@ agg as (
         max(ts)                                     as last_seen
     from b
     group by 1
+),
+scored as (
+    select *,
+        -- Score components, one column each so eval/ can ablate them independently.
+        -- NEED: is something exploitable / exposed right now?
+        least(kev_vulns, 5) * 8                                          as s_kev,
+        case when max_epss >= 0.5 then 10 else 0 end                     as s_epss,
+        case when compromised then 25 else 0 end                         as s_compromised,
+        coalesce(list_sum(list_transform(exposures, lambda e: case
+            when e in ('ics', 'medical') then 10
+            when e in ('remote_access', 'database', 'edge_appliance', 'app_server', 'devops') then 8
+            when e in ('file_share', 'network_admin', 'physical_access') then 6
+            when e in ('camera', 'printer') then 3
+            else 0 end)), 0)                                             as s_exposure,
+        case when eol then 6 else 0 end                                  as s_eol,
+        (case when cert_expired or self_signed then 3 else 0 end)
+          + (case when weak_tls then 3 else 0 end)
+          + (case when missing_hsts then 1 else 0 end)                   as s_hygiene,
+        -- MATURITY: already invested in security -> less likely to need us.
+        -(case when has_securitytxt then 5 else 0 end)
+          - (case when all_behind_cdn then 5 else 0 end)                 as s_maturity,
+        -- FIT: vertical from rules (exposure type + domain); regulated verticals buy security.
+        case
+            when list_contains(exposures, 'medical')
+              or regexp_matches(company_domain, '(health|hospital|clinic|medic|saude|salud|pharma|dental|care)') then 'healthcare'
+            when regexp_matches(company_domain, '\.(edu|ac|edu\.[a-z]{2}|ac\.[a-z]{2}|k12\.[a-z]{2}\.us)$|school|college|univ') then 'education'
+            when regexp_matches(company_domain, '\.(gov|gob|gouv|go|govt|mil)(\.[a-z]{2})?$|council|municip|city|county') then 'government'
+            when regexp_matches(company_domain, '(bank|credit|finan|insur|capital|invest|securities|fund)') then 'finance'
+            when list_contains(exposures, 'ics') then 'industrial'
+            when regexp_matches(company_domain, '(law|legal|attorney|advocat|notar)') then 'legal'
+            else 'other'
+        end                                                              as vertical,
+        case when ips >= 50 then 'enterprise' when ips >= 5 then 'mid-market' else 'smb' end as segment
+    from agg
 )
 select *,
-    -- NEED: is something exploitable / exposed right now?
-      least(kev_vulns, 5) * 8                         -- known-exploited CVEs
-    + case when max_epss >= 0.5 then 10 else 0 end    -- likely to be exploited soon
-    + case when compromised then 25 else 0 end
-    + len(exposures) * 8                              -- RDP/DB/ICS/etc on the internet
-    + case when eol then 6 else 0 end
-    + case when cert_expired or self_signed then 3 else 0 end
-    + case when weak_tls then 3 else 0 end
-    + case when missing_hsts then 1 else 0 end
-    -- MATURITY: already invested in security -> less likely to need us (or better fit for upsell)
-    - case when has_securitytxt then 5 else 0 end
-    - case when all_behind_cdn then 5 else 0 end
-    as score_v0,
+    s_kev + s_epss + s_compromised + s_exposure + s_eol + s_hygiene + s_maturity as score_v0,
     list_filter([
+        case when compromised then 'Backdoor / compromise indicator detected on a host' end,
         case when kev_vulns > 0 then format('{} known-exploited CVEs (CISA KEV): {}', kev_vulns, array_to_string(kev_cves[1:3], ', ')) end,
         case when max_epss >= 0.5 then format('CVE with {:.0f}% exploit probability (EPSS)', max_epss * 100) end,
-        case when compromised then 'Shodan flags host as compromised' end,
         case when len(exposures) > 0 then 'Exposed: ' || array_to_string(exposures, ', ') end,
         case when eol then 'End-of-life software' end,
         case when cert_expired then 'Expired TLS certificate' end,
@@ -120,4 +142,4 @@ select *,
         case when weak_tls then 'Supports TLS 1.0/1.1 or SSL' end,
         case when has_securitytxt then 'Has security.txt (mature security program)' end
     ], lambda x: x is not null) as reasons
-from agg;
+from scored;

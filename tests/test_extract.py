@@ -49,4 +49,15 @@ def test_exposure_from_module_and_port():
 
 def test_malware_infra_and_honeypot_flags():
     assert extract(banner(_shodan={"module": "darktrack-rat"}))["is_malware_infra"]
+    assert extract(banner(_shodan={"module": "njrat"}))["is_malware_infra"]
     assert extract(banner(tags=["honeypot"]))["is_honeypot"]
+
+
+def test_backdoor_modules_mark_the_victim_compromised_not_malware_infra():
+    r = extract(banner(_shodan={"module": "xiaongmai-backdoor"}))
+    assert r["is_compromised"] and not r["is_malware_infra"]
+
+
+def test_saas_tenant_subdomain_is_not_attributed_to_the_platform():
+    r = extract(banner(ssl={"cert": {"subject": {"CN": "acme.myshopify.com"}}}))
+    assert r["company_domain"] is None

@@ -34,3 +34,16 @@
 - Rapid Reset (CVE-2023-44487) was 173k of the KEV hits, version-inferred on nginx. KEV CVEs
   on >20k banners are now ambient. Top reasons are now pitchable: ProxyLogon,
   SharePoint ToolShell, TeamCity, Drupalgeddon, BlueKeep.
+
+## 2026-10-27, random sample + eval harness
+
+- Read the uniform random sample (`scripts/readable_sample.py`). New: victim-side backdoor
+  modules (`ta14-353a`, `xiaongmai-backdoor`) are now `is_compromised`; `njrat`/`blackshades`
+  were slipping past the C2 filter; ~25 unmapped exposure modules added (TeamViewer, X11,
+  WebLogic, SAP router, PLCs, Heidenhain CNC, ...); SaaS tenant domains → infra.
+- Extractor is versioned (`EXTRACT_VERSION`) in the manifest key, so logic changes re-run files.
+- Score split into `s_*` components + rule-based `vertical` and `segment`.
+- Bug, again: `list_sum([])` is NULL. Fixed, and `build_companies` now *fails* if any score is
+  NULL. A third occurrence can't ship silently.
+- Eval: blind stratified label set (200), local labelling UI, precision@k / nDCG / ablation.
+  Smoke-tested with random labels (metrics ≈ random, as they should be).

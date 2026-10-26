@@ -28,6 +28,28 @@
   (walmart.com lives on Google Cloud).
 - Bug caught: `len(NULL)` made the score NULL for every company without an exposure.
 
+### From reading the uniform random sample (`data/sample/READ_ME_50.md`)
+- **Most of the file is noise to a salesperson.** Incapsula edge IPs answer on *every*
+  port (that's why SG has 4.5M banners) and Google Cloud IPs on random high ports. Most
+  `data` fields are empty. The useful signal is a thin layer on top.
+- **Some modules flag victims, not attackers.** `ta14-353a` (US-CERT alert for the
+  Sony-hack wiper implant, 11k banners) and `xiaongmai-backdoor` (XiongMai DVR
+  backdoor, 4.6k) mean *this host is already compromised*. Now `is_compromised`.
+  By contrast `njrat`/`blackshades` are attacker C2 and were slipping past the `-rat` hint.
+- **Exposure classes I was missing** (now mapped): TeamViewer 44k, X11 68k, NoMachine,
+  WebLogic 42k, SAP router, Oracle TNS, DB2, ClickHouse-native, Vault, Java RMI, git,
+  iSCSI, PLC protocols (Omron, GE-SRTP, PLC5, Unitronics, Matrikon OPC), **Heidenhain CNC
+  `lsv2`** (manufacturing), HandPunch biometric time clocks, PJL printers.
+- **Exposed AI infrastructure**: ~3.5k Ollama (port 11434), 428 MCP, `ai` tag 2k.
+  Small now, but a story no other submission will tell: a 2026 attack surface.
+- **SaaS tenant subdomains** (`lindasellforcitycouncil.nationbuilder.com`, `*.azurewebsites.net`,
+  `*.github.io`, `*.myshopify.com`): registrable domain = the platform. Added to the infra list.
+- Nice examples of what good looks like: a Brazilian municipal health system's patient
+  record app (`esus.*.wmsaude.com.br`, title "PEC") on EOL nginx; an oncology SaaS
+  (`digitaloncology`) behind CloudFront; honeypots imitating a Juniper login page.
+- The raw `data` banner carries versions Shodan didn't turn into CVEs (e.g. MikroTik
+  Winbox package versions 6.48.4). Possible extra signal: parse versions ourselves.
+
 ---
 
 ## Head-of-file first pass (download still in progress)

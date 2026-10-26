@@ -21,7 +21,10 @@ def build(parquet: Path, db: Path) -> None:
     con.execute(f"create or replace view banners as select * from "
                 f"read_parquet('{parquet}/banners/*/*.parquet', hive_partitioning=true, union_by_name=true)")
     con.execute(SQL.read_text())
-    n = con.execute("select count(*) from companies").fetchone()[0]
+    n, nulls = con.execute("select count(*), count(*) filter (where score_v0 is null) from companies").fetchone()
+    # A NULL component silently drops a company out of every ranking; fail loudly instead.
+    if nulls:
+        raise SystemExit(f"{nulls:,} companies have a NULL score: a component isn't null-safe")
     print(f"companies: {n:,} in {time.time() - t0:.1f}s -> {db}")
 
 
