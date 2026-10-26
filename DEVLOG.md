@@ -78,3 +78,14 @@
 - `attributed` table: scoring and app evidence read the same rows, so they can't disagree.
 - docs/production.md: queue-per-file design, cost model from measured throughput, diff-based
   triggers, monitoring, CRM feedback loop.
+
+## 2026-10-27, verticals, API tests, write-up
+
+- Vertical rules v2: registry TLDs first (ucsd.edu was "healthcare" because it exposes DICOM),
+  then multilingual keywords over domain + cert O + network owner name (skipped for hosters/telcos).
+  Hand spot-check of 90 random companies: ~80% precision. False positives fixed: "hospital" and
+  German "spital" are substrings of "hospitality"; "fabrik", "chemi" ("alchemists").
+  Spotted bancoitau.cf: a lookalike bank domain on a free TLD, a brand-impersonation signal for later.
+- API tests run a real uvicorn on a free port (7 tests: ordering/pagination, filters, reasons
+  backed by components, detail rank, errors, SQL-injection safety, CSV filters). 16 tests total.
+- README written up with exact funnel numbers from the current build.

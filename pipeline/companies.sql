@@ -134,6 +134,10 @@ agg as (
         bool_or(waf is not null)                    as has_waf,
         bool_or(http_status is not null and not has_hsts) as missing_hsts,
         list(distinct product) filter (where product is not null) as products,
+        lower(company_domain || ' ' || coalesce(mode(cert_subject_o), '') || ' ' ||
+              case when regexp_matches(lower(coalesce(mode(org), '')),
+                   '(hosting|host|server|vps|cloud|data ?cent|colo|telecom|internet|broadband|communications|network|isp|online|digital|cable|mobile|wireless|fiber|amazon|google|microsoft|akamai|cloudflare|incapsula|fastly|ovh|hetzner|godaddy)')
+                   then '' else coalesce(mode(org), '') end) as name_text,
         max(ts)                                     as last_seen
     from b
     group by 1
@@ -160,15 +164,22 @@ scored as (
         -- MATURITY: already invested in security -> less likely to need us.
         -(case when has_securitytxt then 5 else 0 end)
           - (case when all_behind_cdn then 5 else 0 end)                 as s_maturity,
-        -- FIT: vertical from rules (exposure type + domain); regulated verticals buy security.
+        -- FIT: vertical from rules, strongest evidence first:
+        --   1. registry-controlled TLDs (.edu/.ac/.gov/.mil) can't be self-declared;
+        --   2. multilingual keywords over the domain, the cert's O (chosen by the company) and
+        --      the network owner's name (only when the owner isn't a hoster / telco);
+        --   3. what's exposed (DICOM -> healthcare, PLCs -> industrial).
         case
-            when list_contains(exposures, 'medical')
-              or regexp_matches(company_domain, '(health|hospital|clinic|medic|saude|salud|pharma|dental|care)') then 'healthcare'
-            when regexp_matches(company_domain, '\.(edu|ac|edu\.[a-z]{2}|ac\.[a-z]{2}|k12\.[a-z]{2}\.us)$|school|college|univ') then 'education'
-            when regexp_matches(company_domain, '\.(gov|gob|gouv|go|govt|mil)(\.[a-z]{2})?$|council|municip|city|county') then 'government'
-            when regexp_matches(company_domain, '(bank|credit|finan|insur|capital|invest|securities|fund)') then 'finance'
-            when list_contains(exposures, 'ics') then 'industrial'
-            when regexp_matches(company_domain, '(law|legal|attorney|advocat|notar)') then 'legal'
+            when regexp_matches(company_domain, '\.(edu|ac|k12\.[a-z]{2}\.us)(\.[a-z]{2})?$|\.(edu|ac)\.[a-z]{2}$') then 'education'
+            when regexp_matches(company_domain, '\.(gov|gob|gouv|govt|mil|go\.[a-z]{2}|gv\.at|gc\.ca|nhs\.uk)(\.[a-z]{2})?$') then 'government'
+            when regexp_matches(name_text, 'hospitals?([^i]|$)|hospice|clinic|klinik|clinica|krankenhaus|ziekenhuis|spital([^i]|$)|health|saude|salud|sant[eé]|medic|pharma|dental|zahn|oncolog|radiolog|patholog|physio|veterin') then 'healthcare'
+            when regexp_matches(name_text, 'universi|college|school|schule|escola|escuela|academ|lyc[eé]e|gymnas|polytechn|institute of technology') then 'education'
+            when regexp_matches(name_text, 'council|municip|ministr|government|gobierno|gouvernement|regierung|county of|city of|state of|police|polic[ií]a|gemeinde|stadtverwaltung|landkreis|comune|prefeitura|ayuntamiento|kommune|kgrz') then 'government'
+            when regexp_matches(name_text, 'bank|banca|banco|banque|sparkasse|credit|kredit|cr[eé]dito|financ|insur|assur|versicher|seguros|capital|invest|securities|asset manag|wealth|payment|fintech') then 'finance'
+            when regexp_matches(name_text, 'law ?firm|lawyer|legal|attorney|advoca|abogad|avocat|notar|anwalt|kanzlei|solicitor') then 'legal'
+            when list_contains(exposures, 'medical') then 'healthcare'
+            when list_contains(exposures, 'ics')
+              or regexp_matches(name_text, 'manufactur|industri|steel|chemical|plast|automotive|motor company|engineering|machinery|maschinen') then 'industrial'
             else 'other'
         end                                                              as vertical,
         case when ips >= 50 then 'enterprise' when ips >= 5 then 'mid-market' else 'smb' end as segment
