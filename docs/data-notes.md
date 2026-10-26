@@ -1,15 +1,42 @@
 # Data notes (living document)
 
-First pass from the head of the file (100k–300k records) while the download was in
-progress, 2026-10-27. **Re-check every number against random samples across the full
-file** — the head is timestamp-ordered, so it may not be representative.
+## Full file (2026-10-27)
 
-## What the file is
+- **17.6 GB zstd, 14,608,407 banners, 4,992,440 distinct IPs**, one crawl window
+  2026-10-25 18:13 → 2026-10-26 13:06 UTC (~19 h). One unparseable line.
+- Ingest: **206.6 s on 15 workers (~68k banners/s)** → 836 MB Parquet.
+- Coverage: owner-chosen domain (cert CN / HTTP Host) on only 5.9% of banners; PTR 5.6%,
+  other hostnames 3.9%; **84.5% have no domain at all** (IP-only).
+- `vulns` on banners with KEV: 1.9%; exposure classes 2.75%; SSL 6.8%; HTTP 29.5%.
+- Countries: US 5.5M, **SG 4.5M** (CDN/Incapsula edge), CN 0.8M, GB, DE, JP.
+- Exposed services (banners): camera 123k, remote access 73k, file share 51k,
+  database 45k, **DICOM medical imaging 41k**, **ICS 37k (28k fuel-tank gauges)**,
+  network admin 11k, devops 10k, edge appliances 9.7k.
+- Attacker C2 fingerprints: ~66k banners (darktrack, remcos, orcus, nuclear, poison-ivy RATs).
 
-- One `zstd`-compressed JSONL file, ~10.6 GB compressed, ~7x expansion (1 GB → 7.05 GB).
+### Full-file corrections to the head-sample findings
+- **Honeypots are only partly tagged.** A ~1k-host AWS cluster claims every Oracle
+  WebLogic KEV on random high ports; 60–78% tagged honeypot, the rest identical.
+  Rule: one honeypot banner → drop the whole IP (90,476 IPs).
+- **KEV ≠ actionable.** CVE-2023-44487 (HTTP/2 Rapid Reset, version-inferred on 169k
+  nginx), CVE-2024-38475 and CVE-2021-40438 (Apache, version-inferred) account for most KEV hits.
+  KEV CVEs seen on >20k banners are treated as ambient. Companies with a KEV: 38k → 6.5k.
+- **Hosters, layer 3.** Co-tenancy: a domain naming machines whose cert/Host names belong
+  to *other* companies is a hoster (sakura.ne.jp 140 tenants, nazwa.pl 3; mit.edu,
+  walmart.com 0). Plus shared IPs (≥5 domains) are unattributable, plus a name/org
+  keyword rule for VPS brands. ASN tenancy was tried and does **not** separate them
+  (walmart.com lives on Google Cloud).
+- Bug caught: `len(NULL)` made the score NULL for every company without an exposure.
+
+---
+
+## Head-of-file first pass (download still in progress)
+
+First pass from the head of the file (100k–300k records). Superseded where the
+section above disagrees.
+
 - **Shodan banner export**: one line = one service observed on one IP:port at one time.
-- ~944k records per compressed GB → **~10–11M banners, ~75 GB raw** for the whole file.
-- Avg ~7 KB/record (raw `data` banner + parsed HTML dominate).
+- ~7x zstd expansion; avg ~7 KB/record (raw `data` banner + parsed HTML dominate).
 
 ## Field coverage (100k head sample)
 

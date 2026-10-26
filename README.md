@@ -18,11 +18,12 @@ That makes the signal *observed exposure*, which a salesperson can quote back to
 Parquet ──DuckDB──▶ infra filtering ─▶ company rollup ─▶ score + reason codes ─▶ app
 ```
 
-| metric | value (dev machine, 16 cores) |
+| metric | value (dev machine, 16 cores, 15 workers) |
 |---|---|
-| raw → Parquet | ~125x smaller |
-| throughput | ~60k banners/s (~400 MB/s raw JSON) |
-| one file (~10M banners) | ~3 min _(to confirm on the full file)_ |
+| input | 17.6 GB zstd, 14.6M banners, 5.0M IPs, ~19 h crawl window |
+| ingest | **206.6 s** (~68k banners/s) |
+| output | 836 MB Parquet (~21x smaller than the compressed input) |
+| company build + scoring | ~5 s for 280k companies |
 | 1,000 files/month | _TBD: $ estimate_ |
 
 ## Signals
