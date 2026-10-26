@@ -34,6 +34,7 @@ SIGNALS = {
     "exposed": "len(exposures) > 0",
     "eol": "eol",
     "tls": "(cert_expired or self_signed or weak_tls)",
+    "expiring": "cert_days_left <= 14",
 }
 
 
@@ -106,7 +107,8 @@ def stats():
     cur = _q()
     cur.execute("""select count(*) companies, count(*) filter (where score >= 20) hot,
         count(*) filter (where compromised) compromised, count(*) filter (where kev_vulns > 0) kev,
-        count(*) filter (where len(exposures) > 0) exposed from companies""")
+        count(*) filter (where len(exposures) > 0) exposed,
+        count(*) filter (where cert_days_left <= 14) expiring from companies""")
     totals = _rows(cur)[0]
     facets = {}
     for col in ("vertical", "segment", "country"):

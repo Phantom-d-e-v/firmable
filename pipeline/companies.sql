@@ -48,25 +48,64 @@ create or replace table honeypot_ips as
 -- the same fake KEVs (e.g. a ~1k-host AWS cluster claiming every WebLogic CVE).
 select distinct ip from banners where is_honeypot;
 
+create or replace table persona_ips as
+-- Multi-persona IPs: one address answering as ICS + medical + camera + backdoor is a
+-- honeypot or a port-mirroring device, not a real network (only 2-4% are tagged as
+-- honeypots). Four or more exposure classes on one IP; CDN edges excluded (handled below).
+select ip from banners where exposure is not null and not is_cdn
+group by ip having count(distinct exposure) >= 4;
+
+create or replace table asn_owner as
+-- Org-owned networks: 84% of banners carry no domain. When an ASN is not cloud/CDN, one
+-- domain dominates its owner-chosen names, *and* that domain matches the network owner's
+-- name (containment, acronym, or cert O), the ASN's unnamed IPs belong to that company.
+-- The name check is what rejects "busiest tenant on Equinix" (lawyer.com) style errors.
+with named as (
+  select asn, company_domain d, count(*) n, mode(cert_subject_o) cert_o from banners
+  where domain_source in ('cert','http_host') and company_domain is not null
+    and company_domain not in (select company_domain from infra_domains)
+  group by 1,2),
+tot as (select asn, sum(n) total, arg_max(d, n) top_d, arg_max(cert_o, n) cert_o, max(n) top_n from named group by 1),
+net as (select asn, mode(org) org, avg((is_cdn or is_cloud)::int) cloudy, count(distinct ip) ips from banners group by 1),
+cand as (
+  select t.*, n.org, n.ips,
+         lower(split_part(t.top_d, '.', 1)) label,
+         lower(regexp_replace(n.org, '[^A-Za-z ]', '', 'g')) org_norm
+  from tot t join net n using (asn)
+  where t.top_n >= 3 and t.top_n >= 0.8 * t.total and n.cloudy < 0.2)
+select asn, top_d domain, org, ips, top_n, total from cand
+where (len(label) >= 4 and contains(replace(org_norm, ' ', ''), label))                         -- "Adyen N.V." ~ adyen
+   or label = list_aggregate(list_transform(list_filter(string_split(org_norm, ' '),
+              lambda w: len(w) > 2 and w not in ('the', 'and', 'inc', 'llc', 'ltd', 'corp', 'gmbh')),
+              lambda w: w[1]), 'string_agg', '')                                               -- acronym: MIT
+   or jaro_winkler_similarity(lower(coalesce(cert_o, '')), lower(org)) > 0.9;                  -- cert O == network owner
+
 create or replace table ambient_cves as
 -- KEV CVEs inferred from ubiquitous version strings (e.g. CVE-2023-44487 HTTP/2 Rapid
 -- Reset on every nginx) are background noise, not a reason to call someone.
 select cve from (select unnest(kev_cves) cve from banners) group by 1 having count(*) > 20000;
 
-create or replace table companies as
-with ambient as (select coalesce(list(cve), []) cves from ambient_cves),
-b as (
+create or replace table attributed as
+-- Every banner we credit to a company, after all attribution and noise rules. Scoring
+-- and the app's evidence both read this table, so they can never disagree.
+with ambient as (select coalesce(list(cve), []) cves from ambient_cves)
     select banners.* replace (
+        coalesce(banners.company_domain, asn_owner.domain) as company_domain,
         list_filter(kev_cves, lambda x: not list_contains(ambient.cves, x)) as kev_cves
-    )
-    from banners, ambient
-    where company_domain is not null
-      and company_domain not in (select company_domain from infra_domains)
+    ), banners.company_domain is null as via_network
+    from banners
+    cross join ambient
+    left join asn_owner on banners.company_domain is null and banners.asn = asn_owner.asn
+    where coalesce(banners.company_domain, asn_owner.domain) is not null
+      and coalesce(banners.company_domain, asn_owner.domain) not in (select company_domain from infra_domains)
       and ip not in (select ip from shared_ips)
       and ip not in (select ip from honeypot_ips)
+      and ip not in (select ip from persona_ips)
       and not is_honeypot
-      and not is_malware_infra
-),
+      and not is_malware_infra;
+
+create or replace table companies as
+with b as (select * from attributed),
 agg as (
     select
         company_domain,
@@ -81,10 +120,14 @@ agg as (
         max(max_cvss)                               as max_cvss,
         max(max_epss)                               as max_epss,
         sum(n_vulns)                                as vulns,
-        coalesce(list(distinct exposure) filter (where exposure is not null and exposure <> 'compromise'), []) as exposures,
-        bool_or(is_compromised)                     as compromised,
+        -- CDN edges accept every port, so protocol probes against them misfire
+        -- (e.g. ca.gov "exposing" ICS via Incapsula): exposures there don't count.
+        coalesce(list(distinct exposure) filter (where exposure is not null and exposure <> 'compromise' and not is_cdn), []) as exposures,
+        coalesce(bool_or(is_compromised and not is_cdn), false) as compromised,
         bool_or(eol_product or eol_os)              as eol,
         bool_or(cert_expired)                       as cert_expired,
+        min(cert_days_to_expiry) filter (where cert_days_to_expiry >= 0) as cert_days_left,
+        count(*) filter (where via_network)         as services_via_network,
         bool_or(self_signed)                        as self_signed,
         bool_or(weak_tls)                           as weak_tls,
         bool_or(has_securitytxt)                    as has_securitytxt,
@@ -112,6 +155,8 @@ scored as (
         (case when cert_expired or self_signed then 3 else 0 end)
           + (case when weak_tls then 3 else 0 end)
           + (case when missing_hsts then 1 else 0 end)                   as s_hygiene,
+        -- TIMING: a deadline the rep can open with.
+        case when cert_days_left <= 14 then 3 else 0 end                 as s_timing,
         -- MATURITY: already invested in security -> less likely to need us.
         -(case when has_securitytxt then 5 else 0 end)
           - (case when all_behind_cdn then 5 else 0 end)                 as s_maturity,
@@ -130,7 +175,7 @@ scored as (
     from agg
 )
 select *,
-    s_kev + s_epss + s_compromised + s_exposure + s_eol + s_hygiene + s_maturity as score_v0,
+    s_kev + s_epss + s_compromised + s_exposure + s_eol + s_hygiene + s_timing + s_maturity as score_v0,
     list_filter([
         case when compromised then 'Backdoor / compromise indicator detected on a host' end,
         case when kev_vulns > 0 then format('{} known-exploited CVEs (CISA KEV): {}', kev_vulns, array_to_string(kev_cves[1:3], ', ')) end,
@@ -138,6 +183,7 @@ select *,
         case when len(exposures) > 0 then 'Exposed: ' || array_to_string(exposures, ', ') end,
         case when eol then 'End-of-life software' end,
         case when cert_expired then 'Expired TLS certificate' end,
+        case when cert_days_left <= 14 then format('TLS certificate expires in {} days', cert_days_left) end,
         case when self_signed then 'Self-signed certificate' end,
         case when weak_tls then 'Supports TLS 1.0/1.1 or SSL' end,
         case when has_securitytxt then 'Has security.txt (mature security program)' end

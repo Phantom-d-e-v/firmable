@@ -136,8 +136,9 @@ dialog h2 { margin-top: 0; font-size: 18px; } dialog li { margin-bottom: 6px; }
   <h2>How scoring works</h2>
   <p>The input is one month-slice of Shodan internet-scan banners (14.6M services on 5.0M IPs). Each service is attributed to a company, then rolled up per company.</p>
   <ul>
-    <li><b>Attribution</b>: a company is a domain named in a TLS certificate or HTTP Host header it chose. Reverse-DNS names, hosting providers (detected by co-tenancy), shared-hosting IPs, SaaS platforms and CDNs are filtered out, and so are honeypots and attacker C2 servers.</li>
+    <li><b>Attribution</b>: a company is a domain named in a TLS certificate or HTTP Host header it chose, plus unnamed IPs on a network (ASN) registered to that same organisation. Reverse-DNS names, hosting providers (detected by co-tenancy), shared-hosting IPs, SaaS platforms and CDNs are filtered out, and so are honeypots (tagged, or one IP posing as 4+ unrelated device types), CDN edges that answer on every port, and attacker C2 servers.</li>
     <li><b>Need</b>: backdoor/implant detected (+25), known-exploited CVEs from CISA KEV (+8 each, max 5), EPSS ≥ 50% (+10), exposed ICS/medical (+10), remote access/databases/app servers/edge appliances (+8), file shares and network admin (+6), cameras and printers (+3), end-of-life software (+6), TLS hygiene (up to +7).</li>
+    <li><b>Timing</b>: a certificate expiring within 14 days (+3) gives the rep a reason to call this week.</li>
     <li><b>Maturity</b>: security.txt (−5) or everything behind a CDN (−5): already invested.</li>
     <li><b>Noise control</b>: KEV CVEs inferred on more than 20k banners (e.g. HTTP/2 Rapid Reset on every nginx) don't count.</li>
     <li><b>Fit</b>: vertical (rules on domain + exposed service type) and size (IPs observed).</li>
@@ -150,12 +151,12 @@ dialog h2 { margin-top: 0; font-size: 18px; } dialog li { margin-bottom: 6px; }
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = n => Number(n).toLocaleString();
-const SIGNALS = [["compromised","Backdoor detected"],["kev","Known-exploited CVE"],["exposed","Exposed service"],["eol","End-of-life"],["tls","TLS issues"]];
+const SIGNALS = [["compromised","Backdoor detected"],["kev","Known-exploited CVE"],["exposed","Exposed service"],["eol","End-of-life"],["tls","TLS issues"],["expiring","Cert expiring ≤14d"]];
 const EXPOSURE = {remote_access:"Remote access (RDP/VNC/TeamViewer)", database:"Database", ics:"Industrial control (ICS)", medical:"Medical imaging (DICOM)",
   file_share:"File share (SMB/FTP)", network_admin:"Router admin", edge_appliance:"VPN / edge appliance", app_server:"App server (WebLogic/SAP)",
   devops:"DevOps (Docker/K8s/Vault)", camera:"Camera / DVR", printer:"Printer", physical_access:"Door / time clock"};
 const COMPONENTS = [["s_compromised","Backdoor detected"],["s_kev","Known-exploited CVEs"],["s_epss","Exploit probability"],["s_exposure","Exposed services"],
-  ["s_eol","End-of-life software"],["s_hygiene","TLS hygiene"],["s_maturity","Security maturity"]];
+  ["s_eol","End-of-life software"],["s_hygiene","TLS hygiene"],["s_timing","Deadline (cert expiry)"],["s_maturity","Security maturity"]];
 const state = { q:"", vertical:"", segment:"", country:"", exposure:"", sort:"score", signal:"", offset:0, total:0, rows:[] };
 const PAGE = 50;
 
@@ -199,7 +200,7 @@ function renderSignals() {
 
 function reasonTags(r) {
   return (r.reasons || []).slice(0, 3).map(t => {
-    const cls = /Backdoor/.test(t) ? "hot" : /known-exploited|EPSS/.test(t) ? "warn" : /Exposed/.test(t) ? "info" : "";
+    const cls = /Backdoor/.test(t) ? "hot" : /known-exploited|EPSS|expires in/.test(t) ? "warn" : /Exposed/.test(t) ? "info" : "";
     return `<span class="tag ${cls}">${esc(t.length > 70 ? t.slice(0, 68) + "…" : t)}</span>`;
   }).join("");
 }
@@ -244,6 +245,8 @@ function talkingPoints(c, ev) {
     if (e.exposure && e.exposure !== "compromise") add("exp:" + e.exposure, `${esc(EXPOSURE[e.exposure] || e.exposure)} is reachable from the internet on ${where}${e.product ? ` (${esc(e.product)})` : ""}.`);
     if (e.eol) add("eol", `End-of-life software (${esc(e.product || e.module)}) on ${where} no longer gets security patches.`);
     if (e.cert_expired) add("cert", `The TLS certificate on ${where} has expired: visible to every customer who visits.`);
+    else if (e.cert_days_to_expiry != null && e.cert_days_to_expiry >= 0 && e.cert_days_to_expiry <= 14)
+      add("certsoon", `The TLS certificate on ${where} expires in <b>${e.cert_days_to_expiry} days</b>: a natural, low-pressure reason to get in touch this week.`);
   }
   if (!pts.length) add("none", "Only hygiene-level signals; better as a nurture account than a call this week.");
   return pts;
@@ -275,13 +278,14 @@ async function openCompany(domain) {
       <div class="bar"><i class="${v < 0 ? "neg" : ""}" style="width:${Math.abs(v) / max * 100}%"></i></div><span class="num">${v > 0 ? "+" : ""}${v}</span></div>`; }).join("")}
     <h3>Evidence (${d.evidence.length} most relevant services)</h3>
     <div style="overflow-x:auto"><table class="ev"><thead><tr><th>Host</th><th>Service</th><th>Finding</th></tr></thead><tbody>
-    ${d.evidence.map(e => `<tr><td><code>${esc(host(e))}:${e.port}</code><br><span class="note mono">${esc(e.ip)}</span></td>
+    ${d.evidence.map(e => `<tr><td><code>${esc(host(e))}:${e.port}</code><br><span class="note mono">${esc(e.ip)}</span>${e.via_network ? '<br><span class="note" title="No hostname on this IP; attributed because the network (ASN) is registered to this organisation">via owned network</span>' : ""}</td>
       <td>${esc(e.product || e.module)}${e.version ? " " + esc(e.version) : ""}${e.http_title ? `<br><span class="note">“${esc(e.http_title.slice(0, 60))}”</span>` : ""}</td>
       <td>${[e.is_compromised ? '<span class="tag hot">backdoor</span>' : "",
              ...(e.kev_cves || []).slice(0, 4).map(k => `<a class="tag warn" href="https://nvd.nist.gov/vuln/detail/${esc(k)}" target="_blank" rel="noopener">${esc(k)}</a>`),
              e.exposure && e.exposure !== "compromise" ? `<span class="tag info">${esc(EXPOSURE[e.exposure] || e.exposure)}</span>` : "",
              e.max_epss >= 0.5 ? `<span class="tag warn">EPSS ${Math.round(e.max_epss * 100)}%</span>` : "",
              e.eol ? '<span class="tag">EOL</span>' : "", e.cert_expired ? '<span class="tag">cert expired</span>' : "",
+             !e.cert_expired && e.cert_days_to_expiry != null && e.cert_days_to_expiry >= 0 && e.cert_days_to_expiry <= 14 ? `<span class="tag warn">cert expires in ${e.cert_days_to_expiry}d</span>` : "",
              e.weak_tls ? '<span class="tag">TLS 1.0/1.1</span>' : "", e.n_vulns && !(e.kev_cves || []).length ? `<span class="tag">${e.n_vulns} CVEs (version-inferred)</span>` : ""
             ].join("") || '<span class="note">—</span>'}</td></tr>`).join("")}
     </tbody></table></div>

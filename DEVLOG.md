@@ -61,3 +61,20 @@
 - Declined to install `httpx2` (unknown package suggested by an error message); tested the
   API with curl against a real server instead, and ran the app from an `app/`-only copy to
   mimic the container.
+
+## 2026-10-27, live + attribution round 2
+
+- Live on Render: https://breach-radar.onrender.com (all endpoints 200, <1 s warm).
+- Live check exposed caloris.ro: one IP posing as backdoor + ICS + DVR + DICOM. 52k IPs
+  claim ≥3 exposure classes; only 2–4% are tagged honeypots, and many sit on Incapsula edges
+  that accept every port (ca.gov "exposing" ICS). Rules: exposures/compromise on CDN banners
+  don't count; IPs with ≥4 classes are treated as honeypots (4,232 IPs). 3 classes is kept,
+  because one Windows box with RDP+SMB+MSSQL is legitimately 3.
+- Org-owned networks: first cut (dominant domain per non-cloud ASN) gave Equinix→lawyer.com,
+  Orange Romania→protv.ro. Those are busiest tenants, not owners. Adding "network owner name must match
+  the domain" (containment / acronym / cert O) leaves 401 ASNs (MIT, Komerční banka, Ford,
+  UKG Kronos, ekom21) and +10.6k attributed banners.
+- Timing signal: cert expiring ≤14 days (+3, 3,339 companies), surfaced as a talking point.
+- `attributed` table: scoring and app evidence read the same rows, so they can't disagree.
+- docs/production.md: queue-per-file design, cost model from measured throughput, diff-based
+  triggers, monitoring, CRM feedback loop.

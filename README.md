@@ -2,7 +2,7 @@
 
 > Which businesses need cybersecurity help right now, and why?
 
-**Live app:** _TBD_ · **Write-up:** this file · **Data notes:** [docs/data-notes.md](docs/data-notes.md) · **Dev log:** [DEVLOG.md](DEVLOG.md)
+**Live app:** https://breach-radar.onrender.com (free tier, so the first load after idle takes ~30–60 s) · **Write-up:** this file · **Data notes:** [docs/data-notes.md](docs/data-notes.md) · **Dev log:** [DEVLOG.md](DEVLOG.md)
 
 ## The data
 The input is a Shodan banner export: each line is one internet-facing service on one IP:port.
@@ -24,7 +24,7 @@ Parquet ──DuckDB──▶ infra filtering ─▶ company rollup ─▶ score
 | ingest | **206.6 s** (~68k banners/s) |
 | output | 836 MB Parquet (~21x smaller than the compressed input) |
 | company build + scoring | ~5 s for 280k companies |
-| 1,000 files/month | _TBD: $ estimate_ |
+| 1,000 files/month | ~57 worker-hours ≈ **$11–40 compute**, ~$19 Parquet storage ([docs/production.md](docs/production.md)) |
 
 ## Signals
 _TBD: need × fit × timing × reachability, each with evidence._
