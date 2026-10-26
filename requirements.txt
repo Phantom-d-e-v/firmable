@@ -1,0 +1,9 @@
+duckdb
+polars
+pyarrow
+orjson
+zstandard
+tldextract
+fastapi
+uvicorn
+pytest
