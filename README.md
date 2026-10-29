@@ -55,7 +55,8 @@ And signals that only show up when you read records yourself:
 - **Exposed AI infrastructure** (≈3.5k Ollama, 428 MCP servers): small now, but a 2026 attack surface.
 
 Funnel: 14.6M banners → 2.26M with any domain → **669k attributed to 280,380 companies** →
-210k with any signal → **7,971 hot (score ≥ 20)**: 7,238 SMB, 663 mid-market, 70 enterprise.
+106k with at least one signal → **442 hot (score ≥ 20)**: 355 SMB, 58 mid-market, 29 enterprise.
+(Under v0 weights it was 7,971 hot. The eval below shows most of those were noise.)
 
 ## Scoring
 
@@ -66,13 +67,14 @@ explained to a rep and ablated in evaluation:
 |---|---|---|
 | backdoor / implant detected | +25 | already compromised: incident-response budget appears overnight |
 | known-exploited CVEs (CISA KEV) | +8 each, max 5 | attackers are using these today; often a compliance deadline |
-| EPSS ≥ 50% | +10 | likely to be exploited in the next 30 days |
+| the two ubiquitous version-inferred KEVs (jQuery XSS CVE-2020-11023, Apache local privesc CVE-2019-0211) | +3 once | real, but not remote initial access; on ~3.5k banners each |
 | exposed ICS / medical | +10 | regulated, high-impact, rarely staffed for security |
 | exposed remote access, DBs, app servers, VPN/edge, DevOps | +8 | the top initial-access vectors for ransomware |
 | exposed file shares, router admin, door/time clocks | +6 | |
 | exposed cameras, printers | +3 | low value alone, but a hygiene tell |
-| end-of-life software | +6 | no patches exist |
-| TLS hygiene (expired/self-signed, TLS 1.0/1.1, no HSTS) | up to +7 | weak signal of neglect |
+| EPSS ≥ 50% | +3 | tie-breaker (was +10; see eval) |
+| end-of-life software | +2 | tie-breaker (was +6): inferred from version banners |
+| TLS hygiene (expired/self-signed, TLS 1.0/1.1) | up to +2 | tie-breaker (was up to +7) |
 | certificate expiring ≤14 days | +3 | **timing**: a reason to call this week |
 | security.txt, or everything behind a CDN | −5 each | already invested: lower need |
 
@@ -89,7 +91,31 @@ There's no ground truth for "will buy", so I built one and kept it honest ([eval
   `not_company` exists because mis-attribution (hosters posing as companies) is the main failure mode.
 - **Metrics**: precision@10/25/50 and nDCG vs random ordering, mean gain per score bucket
   (must rise with score), `not_company` count in the top 50, leave-one-component-out ablation.
-- **Results**: _pending labels_.
+- **Who labelled**: Claude, blind to score and stratum, against a rubric written before
+  labelling (no API spend; it ran in the coding session). The same agent wrote the rules, so
+  this is circular by construction. [`eval/agreement.py`](eval/agreement.py) measures agreement
+  with any human-labelled subset (Cohen's kappa plus the disagreements). It's the first thing
+  I'd run before trusting these numbers further.
+- **Re-check**: a second blind pass over all 200 in a new order matched the first on 199/200
+  (the one change is applied). That checks consistency and bookkeeping. It isn't an independent rater.
+- **Results** (200 labels: 9 call, 40 maybe, 141 no, 10 not-a-company; ties scored as the
+  expected value over random tie-breaks, random = mean of 1,000 shuffles):
+
+  | | P@10 | P@25 | P@50 | nDCG | gain by bucket ≤0 / 1–9 / 10–19 / ≥20 |
+  |---|---|---|---|---|---|
+  | random | 0.14 | 0.14 | 0.15 | 0.59 | |
+  | v0 (hand-set weights) | 0.30 | 0.40 | 0.39 | 0.86 | 0.01 / 0.03 / 0.00 / 0.27 |
+  | **v1 (after ablation)** | **0.65** | **0.48** | **0.41** | **0.95** | 0.01 / 0.13 / 0.41 / 0.61 |
+
+  The ablation was the useful part. Under v0, **removing** EPSS (+0.04 P@25), EOL (+0.06) or TLS
+  hygiene (+0.07) *improved* the ranking. They fire on version banners of tiny personal sites,
+  which drowned out the KEV, backdoor and exposure signals that did help. v1 demotes them to
+  tie-breakers, and gain now rises monotonically with score. Caveat: v1 was tuned on the same
+  200 labels, so the v1 row is optimistic. The changes were kept coarse (three weights, one
+  CVE list) to limit overfitting, and a fresh label set is the honest test.
+- **Remaining failure mode**: 5 of the top 50 are still *not_company* (a VoIP reseller, a web
+  agency's shared server, a dynamic-DNS service, an IoT vendor's default cert on customer routers).
+  That's the next attribution rule to write.
 - **Vertical rules spot-check**: 90 random companies (15 per vertical) read by hand: ~80%
   precision (government best at 14/15, industrial weakest at ~10/15). The false-positive patterns
   found ("hospital" inside "hospitality", "fabrik" in an IT firm's name) were fixed.
@@ -141,7 +167,8 @@ cases where that mattered: a process pool that would have queued the whole decom
 most companies (twice), a gitignore rule that would have deployed the app without its data, an
 unfamiliar package an error message suggested installing (blocked by the permission check and
 replaced with real-server tests), and a hosting provider's hostname nearly quoted to a prospect. Each was caught by a number that
-didn't add up, and each is now a test, a guard or a rule.
+didn't add up, and each is now a test, a guard or a rule. Labelling was delegated to the agent too,
+which is why the eval states it plainly and ships an agreement check against human labels.
 
 ## What I'd do next
 

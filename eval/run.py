@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+from itertools import groupby
 from pathlib import Path
 
 import duckdb
@@ -59,18 +60,27 @@ def main():
           f"({sum(labels[d] == 'not_company' for d in filtered)} of them labelled not_company)")
 
     def rank(key) -> list[float]:
-        order = sorted(scored, key=key, reverse=True) + filtered
-        return [GAIN[labels[d]] for d in order]
+        # Ties are common (many companies share a score), so each tied group gets its mean
+        # gain: the expected result over random tie-breaks, independent of row order.
+        order = sorted(scored, key=key, reverse=True)
+        out = []
+        for _, grp in groupby(order, key=key):
+            g = [GAIN[labels[d]] for d in grp]
+            out += [sum(g) / len(g)] * len(g)
+        f = [GAIN[labels[d]] for d in filtered]
+        return out + [sum(f) / len(f)] * len(f) if f else out
 
     base = rank(lambda d: scored[d]["score"])
-    rnd = [GAIN[v] for v in labels.values()]
-    random.Random(0).shuffle(rnd)
+    gains = [GAIN[v] for v in labels.values()]
+    shuffles = [random.Random(i).sample(gains, len(gains)) for i in range(1000)]
     print("\n            " + "  ".join(f"P@{k:<4}" for k in KS) + "  nDCG")
-    for name, r in (("score_v0", base), ("random", rnd)):
-        print(f"{name:10}  " + "  ".join(f"{precision_at(r, k):.2f}  " for k in KS) + f"  {ndcg(r):.3f}")
+    print("score       " + "  ".join(f"{precision_at(base, k):.2f}  " for k in KS) + f"  {ndcg(base):.3f}")
+    print("random      " + "  ".join(f"{sum(precision_at(r, k) for r in shuffles) / 1000:.2f}  " for k in KS)
+          + f"  {sum(ndcg(r) for r in shuffles) / 1000:.3f}   (mean of 1000 shuffles)")
 
-    top50 = (sorted(scored, key=lambda d: scored[d]["score"], reverse=True) + filtered)[:50]
-    print(f"\nnot_company in top 50: {sum(labels[d] == 'not_company' for d in top50)}")
+    cut = sorted((scored[d]["score"] for d in scored), reverse=True)[49]
+    print(f"\nnot_company with score >= {cut} (the top 50 incl. ties): "
+          f"{sum(labels[d] == 'not_company' for d in scored if scored[d]['score'] >= cut)}")
 
     print("\nmean gain by score bucket (should rise left→right):")
     buckets = [(-99, 0), (1, 9), (10, 19), (20, 39), (40, 999)]

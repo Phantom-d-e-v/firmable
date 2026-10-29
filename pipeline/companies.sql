@@ -146,8 +146,13 @@ scored as (
     select *,
         -- Score components, one column each so eval/ can ablate them independently.
         -- NEED: is something exploitable / exposed right now?
-        least(kev_vulns, 5) * 8                                          as s_kev,
-        case when max_epss >= 0.5 then 10 else 0 end                     as s_epss,
+        -- v1 (from labelled eval): two KEVs are version-inferred on thousands of web servers and
+        -- aren't remote initial access (jQuery XSS; Apache local privesc), so they count +3 once.
+        least(len(list_filter(kev_cves, lambda c: c not in ('CVE-2020-11023', 'CVE-2019-0211'))), 5) * 8
+          + (case when list_has_any(kev_cves, ['CVE-2020-11023', 'CVE-2019-0211']) then 3 else 0 end) as s_kev,
+        -- EPSS / EOL / TLS hygiene fire on version banners of tiny sites; ablation showed they
+        -- hurt precision at 10/6/7 points, so they're now tie-breakers.
+        case when max_epss >= 0.5 then 3 else 0 end                      as s_epss,
         case when compromised then 25 else 0 end                         as s_compromised,
         coalesce(list_sum(list_transform(exposures, lambda e: case
             when e in ('ics', 'medical') then 10
@@ -155,10 +160,9 @@ scored as (
             when e in ('file_share', 'network_admin', 'physical_access') then 6
             when e in ('camera', 'printer') then 3
             else 0 end)), 0)                                             as s_exposure,
-        case when eol then 6 else 0 end                                  as s_eol,
-        (case when cert_expired or self_signed then 3 else 0 end)
-          + (case when weak_tls then 3 else 0 end)
-          + (case when missing_hsts then 1 else 0 end)                   as s_hygiene,
+        case when eol then 2 else 0 end                                  as s_eol,
+        (case when cert_expired or self_signed then 1 else 0 end)
+          + (case when weak_tls then 1 else 0 end)                       as s_hygiene,
         -- TIMING: a deadline the rep can open with.
         case when cert_days_left <= 14 then 3 else 0 end                 as s_timing,
         -- MATURITY: already invested in security -> less likely to need us.

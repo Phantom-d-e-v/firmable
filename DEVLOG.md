@@ -58,7 +58,8 @@
   (`webdisk.afs.bbk.temporary.site` for cje.net); now only hostnames under the account's domain.
 - `.gitignore`'s `data/` would have silently excluded `app/data/` and shipped an app with no
   data. Scoped to `/data/`.
-- Declined to install `httpx2` (unknown package suggested by an error message); tested the
+- An install of `httpx2` (unknown package suggested by an error message) was blocked by the
+  agent's permission check rather than declined; tested the
   API with curl against a real server instead, and ran the app from an `app/`-only copy to
   mimic the container.
 
@@ -89,3 +90,23 @@
 - API tests run a real uvicorn on a free port (7 tests: ordering/pagination, filters, reasons
   backed by components, detail rank, errors, SQL-injection safety, CSV filters). 16 tests total.
 - README written up with exact funnel numbers from the current build.
+
+## 2026-10-27, eval and v1 weights
+
+- 200 blind labels made by Claude (rubric first, cards shuffled with no score or stratum).
+  9 call / 40 maybe / 141 no / 10 not_company (after the re-check below). Circular by construction, so I added
+  `eval/agreement.py` to measure kappa against any human-labelled subset.
+- v0: P@10 0.30, P@25 0.40, nDCG 0.86 (random: 0.14 / 0.14 / 0.59); gain flat below score 20.
+  Ablation: dropping EPSS, EOL or TLS hygiene each *improved* P@25. They're version-banner
+  signals that fire on every stale nginx on a personal VPS.
+- v1: EPSS 10→3, EOL 6→2, hygiene 7→2, and the two ubiquitous version-inferred KEVs (jQuery XSS,
+  Apache local privesc) count +3 once instead of +8 each. P@10 0.65, P@25 0.48, nDCG 0.95,
+  monotonic gain by bucket. Hot accounts fell from 7,971 to 442. Tuned on the same labels, so optimistic.
+- Still in the top 50: VoIP reseller, web agency shared box, dynamic DNS, IoT vendor default cert.
+- Re-check, done on request: second blind labelling pass, new shuffle, recorded by domain
+  rather than card index. 199/200 identical (veloplanner.net maybe→no, applied), and the
+  domain mapping was correct. Same rater, so this is a consistency check, not independent.
+- Bug caught in `eval/run.py` during the re-check: score ties were broken by DB row order,
+  and "random" was a single shuffle (P@10 0.30 by luck; the true mean is 0.14). It's now
+  tie-aware (expected value over tie-breaks) with random averaged over 1,000 shuffles.
+  Conclusions unchanged; numbers above are the corrected ones.

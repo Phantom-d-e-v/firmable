@@ -7,7 +7,7 @@ There's no ground truth for "this company will buy cybersecurity", so I made my 
 2. **Labelling** (`label_server.py`, http://127.0.0.1:8765): one account at a time with its
    evidence (signals, cert org, page titles, hostnames, ports, products, KEV CVEs). Verdicts:
    `call` / `maybe` / `no` / `not_company` (hoster, ISP, SaaS platform, the main failure mode).
-   Labels are append-only in `labels.jsonl` (last one wins) and committed.
+   Labels are append-only in `labels.jsonl` (last one wins).
 3. **Metrics** (`run.py`): precision@10/25/50 and nDCG over the labelled pool vs a random
    ordering, mean gain per score bucket (should rise with score), `not_company` count in
    the top 50, and a leave-one-component-out ablation on P@25.
@@ -18,6 +18,28 @@ There's no ground truth for "this company will buy cybersecurity", so I made my 
 .venv/bin/python -m eval.run
 ```
 
-Caveats: one labeller (me), and labels judge the same evidence the score uses. So this
+## Labels used here: `labels_ai.jsonl`
+
+The 200 labels were made by Claude (Opus 5.5, in the coding session, no API spend), not
+by a human. To keep them as honest as possible:
+
+- **Blind**: cards were shown without stratum or score, in a shuffled order, with the same
+  fields the labelling UI shows.
+- **Rubric written first**: *call* means a real organisation with a specific, quotable issue
+  (backdoor, KEV on a real app or edge device, exposed DB/RDP/ICS). *maybe* means a real
+  business with a weaker or version-inferred signal. *no* means personal, parked or hobby
+  sites, or nothing meaningful. *not_company* means a hoster, ISP, SaaS tenant or wrong attribution.
+- **Re-checked**: a second blind pass in a new order (`labels_ai_pass2.jsonl`) agreed on
+  199/200. The one disagreement was resolved and is noted in the label.
+- **Circularity risk**: the same agent wrote the scoring rules. The labels did disagree with
+  them (EPSS, EOL and TLS hygiene hurt precision under v0), but that doesn't replace a human.
+  So `agreement.py` measures it: label any subset with `label_server.py`, which writes
+  `labels.jsonl`, then run `python -m eval.agreement` for Cohen's kappa and the disagreements.
+
+```bash
+.venv/bin/python -m eval.run --labels eval/labels_ai.jsonl
+```
+
+Caveats: one labeller, and labels judge the same evidence the score uses. So this
 measures whether the weighting matches a salesperson's judgement, not whether accounts
 convert. In production the label source would be CRM outcomes (meetings booked, deals won).
