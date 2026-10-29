@@ -1,0 +1,30 @@
+{"company_domain": "travelraysoftware.com", "verdict": "maybe", "note": "Small travel-software vendor with EOL nginx and an expired cert on its booking host; real hygiene issues but no KEV"}
+{"company_domain": "infotime.co.uk", "verdict": "call", "note": "Unpatched IIS with MS15-034 (KEV) and an expired cert; looks like a forgotten box, a concrete reason to call"}
+{"company_domain": "iany.com", "verdict": "no", "note": "Single redirect host on a FiOS line, nothing flagged"}
+{"company_domain": "usca.edu", "verdict": "no", "note": "Behind Cloudflare; legacy TLS is the only finding"}
+{"company_domain": "coldquanta.com", "verdict": "no", "note": "One Cloudflare redirect, no signals"}
+{"company_domain": "aml-tele.com", "verdict": "call", "note": "Mail server with Heartbleed (KEV) and self-signed cert; severe and easy to explain"}
+{"company_domain": "noisegatemedia.com", "verdict": "no", "note": "Bare web server, no signals"}
+{"company_domain": "davidswebsite.xyz", "verdict": "not_company", "note": "Personal hobby site on a VPS"}
+{"company_domain": "istor.pk", "verdict": "call", "note": "Backdoor/compromise indicator on its webmail; possible active incident, so IR/MDR outreach"}
+{"company_domain": "danubix.top", "verdict": "not_company", "note": "Numbered mail node (at07) on a .top domain; looks like a hosting/VPN or relay operator, not an end customer"}
+{"company_domain": "aixbot.com", "verdict": "maybe", "note": "Real Chinese hardware brand, but the only evidence is generic EOL nginx on one host"}
+{"company_domain": "mioficina.co", "verdict": "no", "note": "Single MX host, no signals"}
+{"company_domain": "britetele.com", "verdict": "maybe", "note": "Webmin exposed with KEV CVEs, but it also hosts an unrelated real-estate site, so it may be a shared/hosting box"}
+{"company_domain": "thekarmicmuse.com", "verdict": "no", "note": "Mail gateways only, no signals"}
+{"company_domain": "engebras.com.br", "verdict": "call", "note": "Mid-market Brazilian firm, 34 services, PHP-CGI KEV (CVE-2012-1823), EOL software; real attack surface"}
+{"company_domain": "patrimonio.com.mx", "verdict": "maybe", "note": "Financial-sector firm with EOL nginx and legacy TLS on its customer portal, but no KEV"}
+{"company_domain": "ensilo.com", "verdict": "no", "note": "enSilo is now Fortinet (FortiEDR); a security vendor's own infra, not a buyer"}
+{"company_domain": "zbird.net", "verdict": "no", "note": "Tiny site, only EOL nginx"}
+{"company_domain": "intellity.dev", "verdict": "no", "note": "Hobby news-quotes site on a VPS, too small to buy"}
+{"company_domain": "deadline.jp", "verdict": "no", "note": "Single SMTP host, no signals"}
+{"company_domain": "remington-europe.com", "verdict": "call", "note": "Major consumer brand, Apache KEV CVE-2019-0211 across many country sites; budget and a clear hook"}
+{"company_domain": "unimed.com.sg", "verdict": "maybe", "note": "WHM admin login exposed for a medical-sector firm, but it is probably a reseller/shared cPanel box"}
+{"company_domain": "chuangyecheng.cn", "verdict": "maybe", "note": "Admin backend exposed to the internet on EOL nginx; small, CN market"}
+{"company_domain": "moretimefor.fun", "verdict": "not_company", "note": "Personal n8n instance on a hobby domain"}
+{"company_domain": "directsupply.com", "verdict": "no", "note": "Real company, but only an AWS ELB is visible and nothing is flagged"}
+{"company_domain": "sophiakai.gr.jp", "verdict": "no", "note": "Default hosting placeholder page"}
+{"company_domain": "wainnbmzfwmfckr1.net", "verdict": "not_company", "note": "Random-string domain on an EC2 host; not a real company"}
+{"company_domain": "intersect.org.au", "verdict": "call", "note": "Mid-market research-IT org, 67 services, Apache KEV, expired certs, legacy TLS, exposed VPN/Bitwarden/Jupyter"}
+{"company_domain": "optim8.io", "verdict": "call", "note": "PHP-CGI RCE KEV CVE-2024-4577 on prod and dev API hosts; recent and serious"}
+{"company_domain": "ipb.pt", "verdict": "maybe", "note": "Polytechnic with EOL software, expired certs and directory listing; academic budgets are slow"}

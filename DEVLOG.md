@@ -110,3 +110,13 @@
   and "random" was a single shuffle (P@10 0.30 by luck; the true mean is 0.14). It's now
   tie-aware (expected value over tie-breaks) with random averaged over 1,000 shuffles.
   Conclusions unchanged; numbers above are the corrected ones.
+
+## 2026-10-30, second rater
+
+- A fresh-context subagent labelled a stratified 30, prompted as a founder rather than a security
+  analyst, with UI fields only and no rubric. Exact agreement 47% (kappa 0.18); worth-contacting
+  80% (kappa 0.59). It's more generous and calls personal sites not_company. v1 on its labels:
+  P@10 0.85, nDCG 0.97. The ranking agrees; the threshold doesn't. Still an AI rater; a human
+  subset is the real test.
+- Bug: `eval/run.py` crashed on label sets with <50 companies (top-50 cut index). Fixed.
+- The push of v1 didn't redeploy Render on its own; this needs a manual deploy.

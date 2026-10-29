@@ -31,6 +31,10 @@ by a human. To keep them as honest as possible:
   sites, or nothing meaningful. *not_company* means a hoster, ISP, SaaS tenant or wrong attribution.
 - **Re-checked**: a second blind pass in a new order (`labels_ai_pass2.jsonl`) agreed on
   199/200. The one disagreement was resolved and is noted in the label.
+- **Second rater** (`labels_rater.jsonl`): a fresh-context AI agent, prompted as a founder
+  judging for a sales team, given only the UI fields for 30 stratified companies. Agreement:
+  47% exact (kappa 0.18), 80% on worth-contacting (kappa 0.59). v1 on its labels: P@10 0.85,
+  nDCG 0.97 (random 0.35 / 0.69).
 - **Circularity risk**: the same agent wrote the scoring rules. The labels did disagree with
   them (EPSS, EOL and TLS hygiene hurt precision under v0), but that doesn't replace a human.
   So `agreement.py` measures it: label any subset with `label_server.py`, which writes

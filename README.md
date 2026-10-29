@@ -98,6 +98,16 @@ There's no ground truth for "will buy", so I built one and kept it honest ([eval
   I'd run before trusting these numbers further.
 - **Re-check**: a second blind pass over all 200 in a new order matched the first on 199/200
   (the one change is applied). That checks consistency and bookkeeping. It isn't an independent rater.
+- **Second rater**: a fresh-context AI agent, prompted as a founder judging for a sales team, saw
+  only the labelling-UI fields for a stratified 30, with no rubric and no other labels
+  ([`eval/labels_rater.jsonl`](eval/labels_rater.jsonl)). It is still not a human.
+  - Exact 4-way agreement: 47% (kappa 0.18).
+  - "Worth contacting" (call/maybe vs no/not-company): 24/30 (kappa 0.59).
+  - The disagreements are calibration. The rater is more generous (47% worth contacting vs 27%),
+    and it labels personal sites *not_company* where I used *no*.
+  - On its labels, v1 still ranks well: P@10 0.85 vs 0.35 random, nDCG 0.97 vs 0.69.
+  - So the *ordering* holds across raters even where the threshold differs. That's why the app
+    sorts by score rather than relying on one cut-off.
 - **Results** (200 labels: 9 call, 40 maybe, 141 no, 10 not-a-company; ties scored as the
   expected value over random tie-breaks, random = mean of 1,000 shuffles):
 

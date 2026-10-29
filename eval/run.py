@@ -78,7 +78,7 @@ def main():
     print("random      " + "  ".join(f"{sum(precision_at(r, k) for r in shuffles) / 1000:.2f}  " for k in KS)
           + f"  {sum(ndcg(r) for r in shuffles) / 1000:.3f}   (mean of 1000 shuffles)")
 
-    cut = sorted((scored[d]["score"] for d in scored), reverse=True)[49]
+    cut = sorted((scored[d]["score"] for d in scored), reverse=True)[min(49, len(scored) - 1)]
     print(f"\nnot_company with score >= {cut} (the top 50 incl. ties): "
           f"{sum(labels[d] == 'not_company' for d in scored if scored[d]['score'] >= cut)}")
 
