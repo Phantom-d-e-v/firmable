@@ -98,6 +98,16 @@ There's no ground truth for "will buy", so I built one and kept it honest ([eval
   I'd run before trusting these numbers further.
 - **Re-check**: a second blind pass over all 200 in a new order matched the first on 199/200
   (the one change is applied). That checks consistency and bookkeeping. It isn't an independent rater.
+- **Human rater (me)**: 23 blind labels in the same UI, a new batch I hadn't seen the AI's
+  verdicts for, answering "is there a specific, urgent reason to call this week?"
+  ([`eval/labels_human.jsonl`](eval/labels_human.jsonl)).
+  - Ranking on my labels: **P@10 0.80** vs 0.52 random, **nDCG 0.95** vs 0.80. Gain rises with
+    every score bucket: 0.00 / 0.58 / 0.60 / 1.00.
+  - Agreement with the AI labels: 48% exact (kappa 0.28); 16/23 on worth-contacting (kappa 0.44).
+  - Every disagreement is one step: I'm more generous (call vs maybe, maybe vs no).
+  - An earlier batch of 21 answered a looser question ("is this a lead at all?"). It's kept
+    separately in [`eval/labels_human_lead.jsonl`](eval/labels_human_lead.jsonl) and isn't used
+    for the agreement number, because I'd seen the AI's verdicts by then.
 - **Second rater**: a fresh-context AI agent, prompted as a founder judging for a sales team, saw
   only the labelling-UI fields for a stratified 30, with no rubric and no other labels
   ([`eval/labels_rater.jsonl`](eval/labels_rater.jsonl)). It is still not a human.

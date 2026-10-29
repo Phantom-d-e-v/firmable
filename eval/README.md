@@ -31,6 +31,10 @@ by a human. To keep them as honest as possible:
   sites, or nothing meaningful. *not_company* means a hoster, ISP, SaaS tenant or wrong attribution.
 - **Re-checked**: a second blind pass in a new order (`labels_ai_pass2.jsonl`) agreed on
   199/200. The one disagreement was resolved and is noted in the label.
+- **Human rater** (`labels_human.jsonl`, 23 labels, urgent-need question): 48% exact
+  (kappa 0.28), 70% on worth-contacting (kappa 0.44); v1 on these labels P@10 0.80, nDCG 0.95
+  (random 0.52 / 0.80). `labels_human_lead.jsonl` is an earlier batch of 21 that answered
+  "is this a lead at all?", kept for the record. `labels.jsonl` is the raw label-server log of both.
 - **Second rater** (`labels_rater.jsonl`): a fresh-context AI agent, prompted as a founder
   judging for a sales team, given only the UI fields for 30 stratified companies. Agreement:
   47% exact (kappa 0.18), 80% on worth-contacting (kappa 0.59). v1 on its labels: P@10 0.85,

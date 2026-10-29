@@ -120,3 +120,14 @@
   subset is the real test.
 - Bug: `eval/run.py` crashed on label sets with <50 companies (top-50 cut index). Fixed.
 - The push of v1 didn't redeploy Render on its own; this needs a manual deploy.
+
+## 2026-10-30, human labels
+
+- First human batch (21) answered "would I want this as a lead?": 71% call, including accounts with
+  no signals. Agreement with the AI labels was low (kappa 0.08), but that was a question
+  mismatch, not a ranking failure (P@10 0.88 vs 0.64 random even so). Kept as `labels_human_lead.jsonl`.
+- Second batch (23 new, unseen) answered "urgent reason to call this week?": P@10 0.80 vs 0.52,
+  nDCG 0.95 vs 0.80, monotonic gain by bucket; 70% worth-contacting agreement with the AI (kappa 0.44).
+  Disagreements are all one step, with the human more generous.
+- Rater feedback: a backdoor flag alone "warrants validation". The account view should name the
+  matched implant signature. Next UI change.
