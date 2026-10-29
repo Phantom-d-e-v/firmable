@@ -129,5 +129,7 @@
 - Second batch (23 new, unseen) answered "urgent reason to call this week?": P@10 0.80 vs 0.52,
   nDCG 0.95 vs 0.80, monotonic gain by bucket; 70% worth-contacting agreement with the AI (kappa 0.44).
   Disagreements are all one step, with the human more generous.
-- Rater feedback: a backdoor flag alone "warrants validation". The account view should name the
-  matched implant signature. Next UI change.
+- Rater feedback: a backdoor flag alone "warrants validation". Done: talking points now name the
+  signature in plain words (TA14-353A = the Destover/Sony implant; XiongMai firmware backdoor),
+  frame it as a match to verify rather than a confirmed breach, and call out the 3 hosts flagged
+  only by Shodan's `compromised` tag as the weakest case.

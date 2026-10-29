@@ -229,6 +229,11 @@ async function refresh(append = false) {
   $("#rows").querySelectorAll("tr[data-d]").forEach(tr => tr.onclick = () => openCompany(tr.dataset.d));
 }
 
+// Plain-language names for the implant signatures in pipeline/extract.py COMPROMISE_MODULES.
+const BACKDOOR = {
+  "ta14-353a": "the Destover implant from US-CERT alert TA14-353A (the malware used in the 2014 Sony Pictures attack)",
+  "xiaongmai-backdoor": "a known backdoor in XiongMai camera/DVR firmware",
+};
 // Only quote a hostname that belongs to the account; hosters' names on the same IP would confuse the rep.
 let currentDomain = "";
 function host(e) {
@@ -240,7 +245,9 @@ function talkingPoints(c, ev) {
   const add = (key, s) => { if (!seen.has(key) && pts.length < 5) { seen.add(key); pts.push(s); } };
   for (const e of ev) {
     const where = `<code>${esc(host(e))}:${e.port}</code>`;
-    if (e.is_compromised) add("comp", `A backdoor signature (<code>${esc(e.module)}</code>) answered on ${where}, so this host is likely already compromised. Lead with incident response.`);
+    if (e.is_compromised) add("comp", BACKDOOR[e.module]
+      ? `${where} answered Shodan's probe for <b>${BACKDOOR[e.module]}</b> (signature <code>${esc(e.module)}</code>). That's a signature match, not a confirmed breach: open by offering to verify it, then incident response if it holds.`
+      : `Shodan tagged ${where} as compromised (no named signature). Weakest of the backdoor signals: worth a verification offer, not an incident-response pitch.`);
     if (e.kev_cves && e.kev_cves.length) add("kev:" + e.kev_cves[0], `${where} runs ${esc(e.product || "a service")}${e.version ? " " + esc(e.version) : ""} affected by <b>${esc(e.kev_cves[0])}</b>${e.kev_cves.length > 1 ? ` and ${e.kev_cves.length - 1} more` : ""}, on CISA's Known Exploited Vulnerabilities list, so attackers are using it today.`);
     if (e.exposure && e.exposure !== "compromise") add("exp:" + e.exposure, `${esc(EXPOSURE[e.exposure] || e.exposure)} is reachable from the internet on ${where}${e.product ? ` (${esc(e.product)})` : ""}.`);
     if (e.eol) add("eol", `End-of-life software (${esc(e.product || e.module)}) on ${where} no longer gets security patches.`);
